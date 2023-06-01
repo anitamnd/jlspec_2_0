@@ -411,25 +411,12 @@ server <- function(session, input, output) {
 
   # Global variables
   rv <- reactiveValues(data = list(), seq = list(), si = NULL, tmp = NULL,
-              tmpseq = NULL, statsdata = NULL, choices = NULL, drift_plot_select = 1)
+              tmpseq = NULL, statsdata = NULL, choices = NULL, is = NULL, drift_plot_select = 1)
   rankings <- read.csv("./csvfiles/rankings.csv", stringsAsFactors = FALSE)
 
-  #####
-  # Dynamic render rules-------------------------------------------------------
-  #
-
-  # observeEvent("", {
-  #  hide("sequence_panel")
-  #  hide("datatable_panel")
-  #  hide("plot_panel")
-  #  hide("export_panel")
-  # }, once = TRUE)
-
-  observeEvent(list(c(input$sequence, input$example, input$in_file1)),
-    {
+  observeEvent(list(c(input$sequence, input$example, input$in_file)), {
       windowselect("sequence")
-    },
-    ignoreInit = T
+    }, ignoreInit = T
   )
   observeEvent(input$datatable, {
     windowselect("datatable")
@@ -453,10 +440,11 @@ server <- function(session, input, output) {
     windowselect("statistics")
   })
 
-  ## Observes file input and creates a new dataset from input.
-  observeEvent(input$in_file1, {
-    try(dat <- read.csv(input$in_file1$datapath, header = 1, stringsAsFactors = F, check.names = FALSE, encoding = "UTF-8"))
-
+  ## Observes file input and creates a new dataset from input
+  observeEvent(input$in_file, {
+    #TODO deal with this "try" thing
+    try(dat <- read.csv(input$in_file$datapath, header = 1, stringsAsFactors = F, check.names = FALSE))
+    dat <- as.data.frame(apply(dat, c(1,2), function(x) { stri_trans_general(x, "latin-ascii") })) # Convert to ascii to be able to deal with special characters
     lab <- identifylabels(dat)
     batch <- NA
     order <- NA
@@ -466,7 +454,7 @@ server <- function(session, input, output) {
     rv$statsdata <- NULL
     rv$seq[[length(rv$seq) + 1]] <- data.frame(lab, batch, order, class)
     rv$data[[length(rv$data) + 1]] <- dat
-    names(rv$data)[length(rv$data)] <- substr(input$in_file1$name, 1, nchar(input$in_file1$name) - 4)
+    names(rv$data)[length(rv$data)] <- substr(input$in_file$name, 1, nchar(input$in_file$name) - 4)
     rv$choices <- paste(1:length(rv$data), ": ", names(rv$data))
     updateSelectInput(session, "selectdata1", choices = rv$choices, selected = rv$choices[length(rv$choices)])
     updateSelectInput(session, "selectpca1", choices = rv$choices, selected = rv$choices[length(rv$choices)])
@@ -475,7 +463,6 @@ server <- function(session, input, output) {
     show("buttons")
   })
 
-#TODO join these 2?
   observeEvent(input$in_seq, {
     shinyCatch( {
       nseq <- read.csv(input$in_seq$datapath, header = 1, stringsAsFactors = FALSE)
@@ -492,7 +479,7 @@ server <- function(session, input, output) {
   })
 
   observeEvent(input$reuseseq, {
-    try(nseq <- read.csv(input$in_seq$datapath, header = 1, stringsAsFactors = FALSE))
+    nseq <- read.csv(input$in_seq$datapath, header = 1, stringsAsFactors = FALSE)
     nseq <- nseq[, c("sample", "batch", "order", "class")]
     seq <- rv$seq[[rv$si]]
     imseq <- data.frame("sample" = row.names(seq), seq)
@@ -505,10 +492,10 @@ server <- function(session, input, output) {
   observeEvent(input$seq_edit, {
     showModal(
       modalDialog(
-        title = "Edit colunms", size = "s", easyClose = TRUE,
+        title = "Edit columns", size = "s", easyClose = TRUE,
         footer = list(actionButton("seq_edit_confirm", "Confirm"), modalButton("Dismiss")),
         fluidRow(
-          column(width = 9, h4("Colunm name")),
+          column(width = 9, h4("Column name")),
           column(width = 3, style = "text-align: left;", h4("Keep"))
         ),
         lapply(seq(ncol(rv$data[[rv$si]])), function(x) {
@@ -527,11 +514,11 @@ server <- function(session, input, output) {
     )
   })
 
-  observeEvent(input$class_edit, {
+  observeEvent(input$group_edit, {
     showModal(
       modalDialog(
         title = "Edit Group Nicknames", size = "s", easyClose = TRUE,
-        footer = list(actionButton("class_edit_confirm", "Confirm"), modalButton("Dismiss")),
+        footer = list(actionButton("group_edit_confirm", "Confirm"), modalButton("Dismiss")),
         fluidRow(
           column(width = 3, h4("Group")),
           column(width = 9, h4("Nickname"))
@@ -550,7 +537,7 @@ server <- function(session, input, output) {
     )
   })
 
-  ## Duplicates not allowed
+  # Duplicates not allowed
   observeEvent(input$seq_edit_confirm, {
     sapply(seq(ncol(rv$data[[rv$si]])), function(x) {
       isolate(colnames(rv$data[[rv$si]])[x] <- input[[paste0("seq_edit_name", x)]])
@@ -562,7 +549,7 @@ server <- function(session, input, output) {
     removeModal()
   })
 
-  observeEvent(input$class_edit_confirm, {
+  observeEvent(input$group_edit_confirm, {
     groups <- rv$seq[[rv$si]][, 4]
     sapply(seq(ncol(rv$data[[rv$si]])), function(x) {
       if(!is.na(groups[x])) {
@@ -600,15 +587,14 @@ server <- function(session, input, output) {
     show("buttons")
   })
 
-  ## Observes selected data
+  # Update selected data
   observeEvent(input$selectdata1, ignoreInit = TRUE, {
-    # Updates what data is selected.
     rv$si <- which(rv$choices %in% input$selectdata1)
     output$sequi <- renderUI({
       lapply(1:ncol(rv$data[[rv$si]]), function(x) {
         fluidRow(
           column(
-            width = 4,
+            width = 2,
             p(strong(colnames(rv$data[[rv$si]])[x]))
           ),
           column(
@@ -626,6 +612,11 @@ server <- function(session, input, output) {
           column(
             width = 2,
             textInput(paste0("cla", rv$si, x), NULL, value = rv$seq[[rv$si]][x, 4])
+          ),
+          column(
+            width = 2
+            #textInput(paste0("lab", rv$si, x), NULL, value = rv$seq[[rv$si]][x, 5])
+            #TODO
           )
         )
       })
@@ -638,11 +629,12 @@ server <- function(session, input, output) {
     output$dt_boxplot_panel <- renderDT(rv$data[[rv$si]][rv$seq[[rv$si]][, 1] %in% "Name"], rownames = FALSE, options = list(
       autoWidth = TRUE, scrollY = "700px", pageLength = 20
     ))
-    # statistics
+    # Statistics
     output$stats_table <-  renderDT(rv$statsdata, rownames = FALSE, options = list(scrollX = TRUE, scrollY = "700px", pageLength = 20))
 
     if (sum(rv$seq[[rv$si]][, 1] %in% "Name") == 1) {
       is <- findis(rv$data[[rv$si]][rv$seq[[rv$si]][, 1] %in% "Name"])
+      rv$is <- is
       updateCheckboxGroupInput(session, "isChoose", choices = is, selected = is)
     }
   })
@@ -735,11 +727,12 @@ server <- function(session, input, output) {
   })
 
   observeEvent(input$export_edit_confirm, {
-    sapply(1:length(rv$choices), function(x) {
-      isolate(names(rv$data)[x] <- input[[paste0("export_edit_name", x)]])
+    sapply(1:length(rv$choices), function(x) {        
+        isolate(names(rv$data)[x] <- input[[paste0("export_edit_name", x)]])
     })
     keep <- sapply(1:length(rv$choices), function(x) input[[paste0("export_edit_keep", x)]])
     rv$data <- rv$data[keep]
+    rv$si <- names(rv$data)[length(rv$data)]
     rv$choices <- paste(1:length(rv$data), ": ", names(rv$data))
     updateSelectInput(session, "selectdata1", choices = rv$choices, selected = rv$choices[length(rv$choices)])
     updateSelectInput(session, "selectpca1", choices = rv$choices)
@@ -858,7 +851,7 @@ server <- function(session, input, output) {
     } else if (sum(rv$seq[[rv$si]][, 1] %in% "Name") != 1) {
       showNotification("Data must have exactly 1 \"Name\" column", type = "error")
     } else if (is.null(input$isChoose)) {
-      showNotification("No intern standars selected", type = "error")
+      showNotification("No internal standards selected", type = "error")
     } else {
       isseq <- rv$seq[[rv$si]]
       isdat <- isfunc(
@@ -868,8 +861,18 @@ server <- function(session, input, output) {
         method = input$ismethod,
         qc = input$isqc
       )
-      rv$tmpdata <- isdat
+
+      unusedIs <- rv$is[!(rv$is %in% input$isChoose)]
+      unusedIs <-  as.numeric(gsub(" .*$", "", unusedIs))
+      
+      if(length(unusedIs) > 0) {
+        rv$tmpdata <- isdat[-unusedIs, ]
+      } else {
+        rv$tmpdata <- isdat
+      }
       rv$tmpseq <- isseq
+      rv$is <- input$isChoose
+      updateCheckboxGroupInput(session, "isChoose", choices = input$isChoose, selected = input$isChoose)
       updateSelectInput(session, "selectpca1", selected = "Unsaved data", choices = c("Unsaved data", rv$choices))
       output$dttable <- renderDataTable(rv$tmpdata, rownames = FALSE, options = list(scrollX = TRUE, scrollY = "700px", pageLength = 20))
     }
@@ -908,6 +911,13 @@ server <- function(session, input, output) {
       rv$tmpdata <- NULL
       rv$tmpseq <- NULL
     }
+  })
+
+  observeEvent(input$isremove, {
+    dat <- rv$data[[rv$si]]
+    rmdat <- rv$data[[rv$si]][rv$seq[[rv$si]][, 1] %in% "Name"]
+    dat <- dat[!grepl("\\(IS\\)", toupper(rmdat[ , 1])), ]
+    rv$data[[rv$si]] <- dat
   })
 
   observeEvent(input$mvf_run, {
@@ -1112,60 +1122,66 @@ server <- function(session, input, output) {
     seq2 <- rv$seq[[sel]]
     dat2 <- rv$data[[sel]]
 
-    if (sum(seq1[, 1] %in% c("Adduct_pos", "Adduct_neg")) != 1 || sum(seq2[, 1] %in% c("Adduct_pos", "Adduct_neg")) != 1) {
-      sendSweetAlert(session = session, title = "Error", text = "Each dataset must contain exactly one adduct column labeled in the sequence file.", type = "error")
-    } else if (ncol(dat1) != ncol(dat2)) {
-      sendSweetAlert(session = session, title = "Error", text = "Datasets must have the same number of colunms", type = "error")
-    } else {
-      merged_dat <<- merge.func(
-        dat1 = dat1,
-        seq1 = seq1,
-        dat2 = dat2,
-        seq2 = seq2,
-        ppmtol = input$md_ppm,
-        rttol = input$md_rt
-      )
-      clustn <- data.frame(table(merged_dat$mergeID))
-      dub_clust <- clustn[clustn$Freq > 1, ]
-      dub_dat <- merged_dat[merged_dat$mergeID %in% dub_clust[, 1], ]
-      dub_qc <- dub_dat[, seq1[, 1] %in% "QC"]
-      cov <- cv(dub_qc)
-      nclust <- sapply(dub_dat$mergeID, function(x) {
-        table(dub_dat$mergeID)[names(table(dub_dat$mergeID)) == x]
-      })
+    if(names(rv$data)[rv$si] == names(rv$data)[sel]) {
+      sendSweetAlert(session = session, title = "Error", text = "Cannot merge a dataset with itself.", type = "error")
+    }
+    else {
 
-      out_dub <- data.frame(
-        "nClust" = nclust,
-        "Cluster_ID" = dub_dat$mergeID,
-        "Ion_mode" = dub_dat$ionmode,
-        "Adductor" = dub_dat$add,
-        "Name" = dub_dat[, which(seq1[, 1] %in% "Name")],
-        "RT" = dub_dat[, which(seq1[, 1] %in% "RT")],
-        "Mass" = dub_dat[, which(seq1[, 1] %in% "Mass")],
-        "CV" = cov
-      )
-      out_dub <- out_dub[order(out_dub[, 1], out_dub[, 2], decreasing = T), ]
-      md_dup <<- out_dub
-      cluster_ends <- which(!duplicated(out_dub[, 2]))
-      output$md_modal_dt <- renderDataTable(
-        {
-          datatable(out_dub,
-            rownames = F,
-            options = list(dom = "t", autowidth = T, paging = F),
-            selection = list(selected = finddup(out_dub, rankings))
-          ) %>% formatStyle(1:8, `border-top` = styleRow(cluster_ends, "solid 2px"))
-        },
-        server = T
-      )
-
-      showModal(
-        modalDialog(
-          title = "Select features to keep", size = "l",
-          p(paste0(length(unique(dub_dat$mergeID))), " duplcicate clusters found, of those ", paste0(length(unique(out_dub[out_dub[, 1] > 2, ][, 2]))), " consists of more than 2 features."),
-          DTOutput("md_modal_dt"),
-          footer = list(actionButton("md_modal_go", "Remove duplicates"), modalButton("Dismiss"))
+      if (sum(seq1[, 1] %in% c("Adduct_pos", "Adduct_neg")) != 1 || sum(seq2[, 1] %in% c("Adduct_pos", "Adduct_neg")) != 1) {
+        sendSweetAlert(session = session, title = "Error", text = "Each dataset must contain exactly one adduct column labeled in the sequence file.", type = "error")
+      } else if (ncol(dat1) != ncol(dat2)) {
+        sendSweetAlert(session = session, title = "Error", text = "Datasets must have the same number of colunms", type = "error")
+      } else {
+        merged_dat <<- merge.func(
+          dat1 = dat1,
+          seq1 = seq1,
+          dat2 = dat2,
+          seq2 = seq2,
+          ppmtol = input$md_ppm,
+          rttol = input$md_rt
         )
-      )
+        clustn <- data.frame(table(merged_dat$mergeID))
+        dub_clust <- clustn[clustn$Freq > 1, ]
+        dub_dat <- merged_dat[merged_dat$mergeID %in% dub_clust[, 1], ]
+        dub_qc <- dub_dat[, seq1[, 1] %in% "QC"]
+        cov <- cv(dub_qc)
+        nclust <- sapply(dub_dat$mergeID, function(x) {
+          table(dub_dat$mergeID)[names(table(dub_dat$mergeID)) == x]
+        })
+
+        out_dub <- data.frame(
+          "nClust" = nclust,
+          "Cluster_ID" = dub_dat$mergeID,
+          "Ion_mode" = dub_dat$ionmode,
+          "Adductor" = dub_dat$add,
+          "Name" = dub_dat[, which(seq1[, 1] %in% "Name")],
+          "RT" = dub_dat[, which(seq1[, 1] %in% "RT")],
+          "Mass" = dub_dat[, which(seq1[, 1] %in% "Mass")],
+          "CV" = cov
+        )
+        out_dub <- out_dub[order(out_dub[, 1], out_dub[, 2], decreasing = T), ]
+        md_dup <<- out_dub
+        cluster_ends <- which(!duplicated(out_dub[, 2]))
+        output$md_modal_dt <- renderDataTable(
+          {
+            datatable(out_dub,
+              rownames = F,
+              options = list(dom = "t", autowidth = T, paging = F),
+              selection = list(selected = finddup(out_dub, rankings))
+            ) %>% formatStyle(1:8, `border-top` = styleRow(cluster_ends, "solid 2px"))
+          },
+          server = T
+        )
+
+        showModal(
+          modalDialog(
+            title = "Select features to keep", size = "l",
+            p(paste0(length(unique(dub_dat$mergeID))), " duplcicate clusters found, of those ", paste0(length(unique(out_dub[out_dub[, 1] > 2, ][, 2]))), " consists of more than 2 features."),
+            DTOutput("md_modal_dt"),
+            footer = list(actionButton("md_modal_go", "Remove duplicates"), modalButton("Dismiss"))
+          )
+        )
+      }
     }
   })
 
@@ -1293,10 +1309,12 @@ server <- function(session, input, output) {
       tdata <- rv$statsdata
     }
     tseq <- rv$seq[[rv$si]][rv$seq[[rv$si]][, 1] %in% c("Name",  "Sample"), ]
+    #TODO mean scale
+    # does order matter here?
     if(input$norm_qc) {
       tdata[, -1] <- t(t(tdata[, -1]) - colMeans(as.matrix(tdata[,-1]), na.rm=T))
     }
-    if(input$logtrafo) {
+    if(input$logtrans) {
       tdata[, -1] <- log2(tdata[, -1])
     }
     rv$statsdata <- tdata
@@ -1316,10 +1334,10 @@ server <- function(session, input, output) {
       tdata <- addNAColumns(tdata, tseq, groups, NumReps)
 
 
-      PolySTestMessage <- toJSON(list(numrep=NumReps, numcond=NumCond, grouped=F, paired=input$paired, firstquantcol=2, 
-                                    expr_matrix=as.list(as.data.frame(tdata))))
-      updateTextInput(session, "app_log", value="Opening PolySTest and data upload ...")
-      js$send_message(url=input$url_polystest, dat=PolySTestMessage, tool="PolySTest")
+      #PolySTestMessage <- toJSON(list(numrep=NumReps, numcond=NumCond, grouped=F, paired=input$paired, firstquantcol=2, 
+      #                              expr_matrix=as.list(as.data.frame(tdata))))
+      #updateTextInput(session, "app_log", value="Opening PolySTest and data upload ...")
+      #js$send_message(url=input$url_polystest, dat=PolySTestMessage, tool="PolySTest")
       enable("retrieve_polystest")
     }
   })
