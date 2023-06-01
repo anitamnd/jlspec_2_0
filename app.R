@@ -45,7 +45,7 @@ ui <- dashboardPage(
           style = "primary",
           fluidRow(
             style = "padding: 0px;",
-            column(12, fileInput("in_file1", "Select file", accept = c("txt/csv", "text/comma-seperated-values, text/plain", ".csv"),
+            column(12, fileInput("in_file", "Select file", accept = c("txt/csv", "text/comma-seperated-values, text/plain", ".csv"),
                       width = "100%"), style = "padding: 0px;")
           ),
           fluidRow(
@@ -65,23 +65,14 @@ ui <- dashboardPage(
           ),
           fluidRow(
             style = "margin-right: 0px;",
-            column(6, bsButton("bf", "Blank filtrate", width = "100%"), style = "padding-left:0px;"),
-            column(6)
+            column(12, checkboxInput("bfdiscard", "Discard blank", value = T, width = "100%"), style = "padding: 0px; margin-top: -25px; margin-bottom: -15px; margin-left: 5px;"),
+            column(12, checkboxInput("bfkeepis", "Keep IS", value = T, width = "100%"), style = "padding: 0px; margin-top: -15px; margin-bottom: -15px; margin-left: 5px;"),
+            column(12, checkboxInput("bfnewsave", "Save as new file", value = T, width = "100%"), style = "padding: 0px; margin-top: -15px; margin-bottom: -15px; margin-left: 5px;")
           ),
           fluidRow(
             style = "margin-right: 0px;",
-            column(6, bsButton("bfsave", "Save", width = "100%"), style = "padding-left:0px;"),
-            column(6)
-          ),
-          splitLayout(
-            style = "margin-right: 0px;",
-            checkboxInput("bfdiscard", label = "Discard blank", value = T, width = "100%"),
-            checkboxInput("bfnewsave", "Save as new file", value = T, width = "100%")
-          ),
-          splitLayout(
-            style = "margin-right: 0px;",
-            checkboxInput("bfkeepis", "Keep IS", value = T, width = "100%"),
-            NULL
+            column(6, bsButton("bf", "Blank filtrate", width = "100%"), style = "padding-left:0px; margin-top: 10px;"),
+            column(6, bsButton("bfsave", "Save", width = "100%"), style = "padding-left:0px; margin-top: 10px;"),
           )
         ),
         bsCollapsePanel("Missing value filtration",
@@ -99,7 +90,7 @@ ui <- dashboardPage(
           )),
           fluidRow(column(
             6,
-            prettyCheckbox("mvf_newsave", "Save as new file", value = T, width = "100%")
+            checkboxInput("mvf_newsave", "Save as new file", value = T, width = "100%")
           )),
           fluidRow(
             style = "margin-right: 0px;",
@@ -117,18 +108,18 @@ ui <- dashboardPage(
           ),
           fluidRow(
             style = "margin-right: 0px;",
-            column(6, bsButton("is", "Is normalize", width = "100%"), style = "padding-left:0px;"),
-            column(6, bsButton("is_optimize", "optimize", width = "100%"), style = "padding-left:0px;")
+            column(6, checkboxInput("isqc", "Normalize QC", value = T, width = "100%"), style = "padding: 0px; margin-top: -30px; margin-left: 10px; margin-right: -10px;"),
+            column(6, checkboxInput("isnewsave", "Save as new file", value = T, width = "100%"), style = "padding: 0px; margin-top: -30px; margin-left: 10px; margin-right: -10px;")
           ),
           fluidRow(
             style = "margin-right: 0px;",
-            column(6, bsButton("issave", "Save", width = "100%"), style = "padding-left:0px;"),
-            column(6)
+            column(6, bsButton("is", "IS normalize", width = "100%"), style = "padding-left:0px;"),
+            column(6, bsButton("is_optimize", "Optimize", width = "100%"), style = "padding-left:0px;")
           ),
           fluidRow(
             style = "margin-right: 0px;",
-            column(6, checkboxInput("isqc", "Normalize QC", value = T, width = "100%"), style = "padding: 0px; margin-top: -10px; margin-left: 10px; margin-right: -10px;"),
-            column(6, checkboxInput("isnewsave", "Save as new file", value = T, width = "100%"), style = "padding: 0px; margin-top: -10px; margin-left: 10px; margin-right: -10px;")
+            column(6, bsButton("isremove", "Remove IS", width = "100%"), style = "padding-left:0px;"),
+            column(6, bsButton("issave", "Save", width = "100%"), style = "padding-left:0px;")          
           )
         ),
         bsCollapsePanel("Imputation",
@@ -159,28 +150,24 @@ ui <- dashboardPage(
           fluidRow(hidden(div(id = "dc_degree_hide", sliderInput("dc_degree", "degree", min = 0, max = 2, value = 2, step = 1, width = "100%")))),
           fluidRow(
             style = "margin-right: 0px;",
+            column(12, checkboxInput("dc_newsave", "Save as new file", value = T, width = "100%"), style = "padding: 0px; margin-top: -10px; margin-left: 10px; margin-right: -10px;"),
             column(6, bsButton("dc_run", "Run", width = "100%"), style = "padding-left:0px;"),
-            column(6)
-          ),
-          fluidRow(
-            style = "margin-right: 0px;",
-            column(6, bsButton("dc_save", "Save", width = "100%"), style = "padding-left:0px;"),
-            column(6)
-          ),
-          fluidRow(
-            style = "margin-right: 0px;",
-            column(6, checkboxInput("dc_newsave", "Save as new file", value = T, width = "100%"), style = "padding: 0px; margin-top: -10px; margin-left: 10px; margin-right: -10px;")
+            column(6, bsButton("dc_save", "Save", width = "100%"), style = "padding-left:0px;")
           )
         ),
         bsCollapsePanel("Merge datasets",
           style = "primary",
-          fluidRow(column(12, selectInput("md_select", "Select dataset to merge with", choices = NULL, width = "100%"))),
+          fluidRow(selectInput("md_select", "Select dataset to merge with", choices = NULL, width = "100%")),
           fluidRow(
-            column(6, numericInput("md_ppm", "M/z tolerance ppm", min = 0, value = 10)),
-            column(6, numericInput("md_rt", "RT tolerance", min = 0, value = 0.1, step = 0.01))
+            style = "margin-right: 0px;",
+            column(6, numericInput("md_ppm", "M/z tolerance ppm", min = 0, value = 10, width = "100%"), style = "padding-left:0px;"),
+            column(6, numericInput("md_rt", "RT tolerance", min = 0, value = 0.1, step = 0.01, width = "100%"), style = "padding-left:0px;")
           ),
-          fluidRow(column(6, bsButton("md_rankings", "Edit priorities", width = "100%"))),
-          fluidRow(column(6, bsButton("md_run", "Run", width = "100%")))
+          fluidRow(
+            style = "margin-right: 0px;",
+            column(6, bsButton("md_rankings", "Edit priorities", width = "100%"), style = "padding-left:0px;"),
+            column(6, bsButton("md_run", "Run", width = "100%"), style = "padding-left:0px;")
+          )
         )
       )
     ),
@@ -188,7 +175,7 @@ ui <- dashboardPage(
   ),
 
   #### Main Body ####
-
+  
   dashboardBody(
     tags$head(tags$style(".modal-sm{ width:300px}
                          .modal-lg{ width:1200px}")),
@@ -282,7 +269,7 @@ ui <- dashboardPage(
             ),
             box(
               width = NULL, title = "Group nicknames",
-              actionButton("class_edit", "Edit", width = 100)
+              actionButton("group_edit", "Edit", width = 100)
             ),
             box(
               width = NULL, title = "Download sequence file",
@@ -298,14 +285,8 @@ ui <- dashboardPage(
           id = "datatable_panel",
           column(
             width = 12,
-            box(
-              width = NULL,
-              DTOutput("dttable")
-            )
-          )
-        )
-      )
-    ),
+            box(width = NULL, DTOutput("dttable"))
+    )))),
     fluidRow(
       hidden(
         div(
@@ -326,37 +307,30 @@ ui <- dashboardPage(
               tabBox(tabPanel(title = "Første panel", htmlOutput("info1"))),
               tabBox(tabPanel(title = "second", htmlOutput("info2")))
             )
-          )
-        )
-      )
-    ),
+    )))),
     fluidRow(
       hidden(
         div(
           id = "statistics_panel",
           fluidPage(
-            # h3("Data treatment pre-submission"),
             fluidRow(
               column(6, id="pr_c1",
                   h4("Data manipulation and adjustments"),
-                  column(10,checkboxInput("logtrafo", "Log-transform data", value=F)),
-                  column(10,checkboxInput("norm_qc", "Normalize data", value=F)),
-                  actionButton("adjust_button", "Transform data")          
+                  column(10,checkboxInput("norm_qc", "Normalization by a pooled sample (QC)", value=F)),
+                  column(10,checkboxInput("logtrans", "Log-transform data", value=F)),
+                  column(10,checkboxInput("mean_scale", "Mean scale", value=F)),                  
+                  actionButton("adjust_button", "Transform data") #TODO save button      
               ),
               column(5, id="pr_c3",
                   h4("Summary"),
                   actionButton("send_polystest", "Send to PolySTest"),
                   span(textOutput("connection_polystest"), style="color:#33DD33;"),     
                   textInput("url_polystest",label="URL",value="http://computproteomics.bmb.sdu.dk:443/app_direct/PolySTest/"),
-                  disabled(actionButton("retrieve_polystest", "Retrieve results from PolySTest"))
-              )
+                  disabled(actionButton("retrieve_polystest", "Retrieve results from PolySTest"))              )
             ),
             br(),
             fluidRow(column(12, box(width = NULL, DTOutput("stats_table"))))
-          )
-        )
-      )
-    ),
+    )))),
     fluidRow(
       hidden(
         div(
@@ -368,9 +342,7 @@ ui <- dashboardPage(
             fluidRow(checkboxGroupInput("export_xml_list", "Choose sheets", choices = NULL, selected = NULL)),
             fluidRow(downloadButton("export_xml", "Export combined .xlsx"))
           ))
-        )
-      )
-    ),
+    ))),
     fluidRow(
       hidden(
         div(
@@ -398,9 +370,7 @@ ui <- dashboardPage(
             )),
             uiOutput("boxplot_ui")
           )
-        )
-      )
-    ),
+    ))),
     fluidRow(
       hidden(
         div(
@@ -418,9 +388,7 @@ ui <- dashboardPage(
             ),
             uiOutput("drift_ui")
           )
-        )
-      )
-    ),
+    ))),
     fluidRow(
       hidden(
         div(
