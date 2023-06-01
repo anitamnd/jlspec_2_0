@@ -228,7 +228,7 @@ ui <- dashboardPage(
               title = textOutput("diboxtitle"), width = NULL,
               fluidRow(
                 column(
-                  width = 4,
+                  width = 2,
                   h4("Sample")
                 ),
                 column(
@@ -246,6 +246,10 @@ ui <- dashboardPage(
                 column(
                   width = 2,
                   h4("Group")
+                ),
+                column(
+                  width = 2,
+                  h4("Time")
                 )
               ),
               uiOutput("sequi")

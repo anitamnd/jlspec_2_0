@@ -1,6 +1,3 @@
-##
-#   Functions for omicsapp
-##
 blankfiltration <- function(dat, seq, xbf, keepis) {
   dat[seq[, 1] %in% "Blank"][is.na(dat[seq[, 1] %in% "Blank"])] <- 0
   bf <- apply(dat[seq[, 1] %in% "Blank"], 1, mean) * xbf < apply(dat[seq[, 1] %in% "QC"], 1, mean, na.rm = TRUE)
@@ -15,6 +12,7 @@ blankfiltration <- function(dat, seq, xbf, keepis) {
 
 isfunc <- function(dat, seq, is, method, qc) {
   rt <- which(seq[, 1] == "RT")
+  isname <- is
   is <- as.numeric(gsub(" .*$", "", is))
   if (qc) {
     sel <- c("Sample", "QC")
@@ -23,13 +21,18 @@ isfunc <- function(dat, seq, is, method, qc) {
   }
   sdat <- dat[seq[, 1] %in% sel]
   sdat[sdat == 0] <- NA
+  is <- is[complete.cases(sdat[is, ])] # remove IS with missing values
   near <- sapply(dat[, rt], function(y) {
     which.min(abs(dat[is, rt] - y))
   })
-
+  # make a substring from the start of the annotation and until the first white space. 
+  # If thissubstring matches any of the substrings from the internal standards, it will 
+  # prioritize normalizing to this. If no substring matches are found, it will 
+  # normalize to the internal standard with the most similar retention time
   if (method == "Same lipid structure") {
     name <- dat[seq[, 1] %in% "Name"]
     istype <- gsub(" .*$", "", name[is, ])
+    # istype <- istype[complete.cases(sdat[is, ])]
     near <- sapply(seq(name[, 1]), function(x) {
       if (gsub(" .*$", "", name[x, 1]) %in% istype) {
         which(istype %in% gsub(" .*$", "", name[x, 1]))
@@ -38,12 +41,17 @@ isfunc <- function(dat, seq, is, method, qc) {
       }
     })
   }
-  sdat <- sapply(seq(ncol(sdat)), function(j) {
+  sapply(seq(ncol(sdat)), function(j) {
     sapply(seq(nrow(sdat)), function(i) {
-      sdat[i, j] / sdat[is, j][near[i]]
+      sdat[i, j] <- sdat[i, j] / sdat[is, j][near[i]]
     })
   })
+
+  isnorm <- sapply(seq(nrow(sdat)), function(x) {
+    isname[near[x]]
+  })
   dat[seq[, 1] %in% sel] <- sdat
+  dat <- cbind(dat, data.frame(isnorm = isnorm))
   return(dat)
 }
 
@@ -61,6 +69,7 @@ isopti <- function(dat, seq, is, method, qc) {
 }
 
 findis <- function(dat) {
+  #TODO grey out IS with missing values
   nr <- grepl("\\(IS\\)", toupper(dat[, 1]))
   if (sum(nr) > 0) {
     name <- as.vector(dat[nr, 1])
@@ -397,15 +406,20 @@ duplicaterank <- function(duplicate, rankings) {
 # Check replicates and adds empty columns if necessary
 addNAColumns <- function(dat, seq, groups, maxreps) {
   tdat <- dat[,1]
-  for(cl in 1:length(levels(groups))) {
-    cl_f <- dat[, seq[, 4] %in% levels(groups)[cl]]
-    tdat <- cbind(tdat, cl_f)
-    if(length(cl_f) < maxreps) {
-      tdat <- cbind(tdat, t(rep(NA, maxreps - length(cl_f))))
+  for(group in 1:length(levels(groups))) {
+    groupdat <- dat[, seq[, 4] %in% levels(groups)[group]]
+    tdat <- cbind(tdat, groupdat)
+    if(length(groupdat) < maxreps) {
+      tdat <- cbind(tdat, t(rep(NA, maxreps - length(groupdat))))
     }
-    colnames(tdat)[(ncol(tdat)-maxreps+1):ncol(tdat)] <- rep(paste("G", levels(groups)[cl], sep = "_"), maxreps)
+    colnames(tdat)[(ncol(tdat)-maxreps+1):ncol(tdat)] <- rep(paste("G", levels(groups)[group], sep = "_"), maxreps)
   }
   return(tdat)
+}
+
+qcNormalization <- function() {
+  #TODO
+  
 }
 
 windowselect <- function(input) {
